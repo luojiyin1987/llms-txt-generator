@@ -8,7 +8,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
-from urllib.parse import parse_qs, urljoin, urlparse, urlunparse
+from urllib.parse import parse_qs, urlencode, urljoin, urlparse, urlunparse
 from urllib.request import Request, urlopen
 import xml.etree.ElementTree as ET
 
@@ -154,7 +154,7 @@ def normalize_url(url: str, base_url: str | None = None) -> str:
 
     clean = parsed._replace(
         fragment="",
-        query="&".join(f"{key}={value}" if value else key for key, value in filtered_query),
+        query=urlencode(filtered_query, doseq=True),
     )
     rebuilt = urlunparse(clean)
     if rebuilt.endswith("/") and parsed.path not in {"", "/"}:
@@ -288,15 +288,14 @@ def classify_target(target: str, title: str = "") -> tuple[str, str, str]:
 
 
 def unique_records(records: Iterable[PageRecord]) -> list[PageRecord]:
-    seen: set[str] = set()
-    result: list[PageRecord] = []
+    merged: dict[str, PageRecord] = {}
     for record in records:
         key = normalize_url(record.target)
-        if key in seen:
+        if key not in merged:
+            merged[key] = record
             continue
-        seen.add(key)
-        result.append(record)
-    return result
+        merged[key] = merge_records(merged[key], record)
+    return list(merged.values())
 
 
 def group_records(records: Iterable[PageRecord]) -> dict[str, list[PageRecord]]:
@@ -333,3 +332,123 @@ def infer_target_from_markdown_path(path: Path, base_url: str | None = None, rep
     if repo_url:
         return normalize_url(rel, base_url=repo_url.rstrip("/") + "/blob/main/")
     return rel
+
+
+def hostname_of(value: str) -> str:
+    if not is_url(value):
+        return ""
+    return (urlparse(value).hostname or "").lower().rstrip(".")
+
+
+def derive_allowed_hosts(*values: str | None, allow_domains: Iterable[str] | None = None) -> set[str]:
+    hosts = {hostname_of(value) for value in values if value}
+    hosts.discard("")
+    if allow_domains:
+        for domain in allow_domains:
+            clean = domain.strip().lower().rstrip(".")
+            if clean:
+                hosts.add(clean)
+    return hosts
+
+
+def target_is_allowed(target: str, allowed_hosts: set[str]) -> bool:
+    if not is_url(target):
+        return True
+    if not allowed_hosts:
+        return False
+    hostname = hostname_of(target)
+    return any(hostname == allowed or hostname.endswith(f".{allowed}") for allowed in allowed_hosts)
+
+
+def filter_records_by_hosts(records: Iterable[PageRecord], allowed_hosts: set[str]) -> tuple[list[PageRecord], list[PageRecord]]:
+    kept: list[PageRecord] = []
+    dropped: list[PageRecord] = []
+    for record in records:
+        if target_is_allowed(record.target, allowed_hosts):
+            kept.append(record)
+        else:
+            dropped.append(record)
+    return kept, dropped
+
+
+DECISION_PRIORITY = {"exclude": 3, "include": 2, "optional": 1}
+SOURCE_PRIORITY = {
+    "seed-page": 6,
+    "docs-dir": 6,
+    "readme": 6,
+    "site-url": 5,
+    "seed-link": 4,
+    "docs-link": 4,
+    "readme-link": 4,
+    "sitemap": 1,
+}
+SECTION_PRIORITY = {
+    "Excluded": 5,
+    "API": 4,
+    "Guides": 4,
+    "Getting Started": 4,
+    "Examples": 3,
+    "Docs": 2,
+    "Optional": 1,
+}
+
+
+def title_quality(title: str, target: str) -> int:
+    clean = collapse_ws(title)
+    if not clean or clean in {"Home", "Untitled"}:
+        return 0
+    slug = Path(urlparse(target).path if is_url(target) else target).name.replace("-", " ").replace("_", " ").strip().lower()
+    score = 1
+    if clean.lower() != slug:
+        score += 2
+    if " " in clean:
+        score += 1
+    return score
+
+
+def description_quality(description: str) -> int:
+    clean = collapse_ws(description)
+    if not clean:
+        return 0
+    return min(len(clean), 240)
+
+
+def record_priority(record: PageRecord) -> tuple[int, int, int, int, int]:
+    return (
+        DECISION_PRIORITY.get(record.decision, 0),
+        description_quality(record.description),
+        title_quality(record.title, record.target),
+        SECTION_PRIORITY.get(record.section, 0),
+        SOURCE_PRIORITY.get(record.source, 0),
+    )
+
+
+def better_title(left: PageRecord, right: PageRecord) -> str:
+    left_score = title_quality(left.title, left.target)
+    right_score = title_quality(right.title, right.target)
+    if right_score > left_score:
+        return right.title
+    if left_score > right_score:
+        return left.title
+    return right.title if len(collapse_ws(right.title)) > len(collapse_ws(left.title)) else left.title
+
+
+def better_description(left: PageRecord, right: PageRecord) -> str:
+    left_score = description_quality(left.description)
+    right_score = description_quality(right.description)
+    if right_score > left_score:
+        return right.description
+    return left.description
+
+
+def merge_records(left: PageRecord, right: PageRecord) -> PageRecord:
+    primary = left if record_priority(left) >= record_priority(right) else right
+    return PageRecord(
+        target=normalize_url(primary.target),
+        title=better_title(left, right),
+        description=better_description(left, right),
+        section=primary.section,
+        decision=primary.decision,
+        reason=primary.reason,
+        source=",".join(sorted(set(filter(None, [left.source, right.source])))),
+    )
