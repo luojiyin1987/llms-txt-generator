@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from llms_site_lib import PageRecord, normalize_url, unique_records
+from llms_site_lib import PageRecord, classify_target, normalize_url, unique_records
 
 
 def run(*args: str) -> subprocess.CompletedProcess[str]:
@@ -56,6 +56,12 @@ def main() -> int:
     assert len(merged) == 1
     assert merged[0].title == "API Reference"
     assert merged[0].description == "REST API overview"
+
+    docsify_classification = classify_target("https://example.com/docsify-demo", title="Docsify Demo")
+    assert docsify_classification[0] != "Docs" or docsify_classification[2] != "generic docs signal"
+
+    apidoc_classification = classify_target("https://example.com/apidoc", title="Apidoc")
+    assert apidoc_classification[0] != "API" or apidoc_classification[2] != "matched core section token"
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp = Path(tmpdir)
@@ -111,6 +117,7 @@ Example Docs is the home for the SDK and API guides.
         assert all("github.com" not in page["target"] for page in plan["pages"])
         api_page = next(page for page in plan["pages"] if page["target"] == "https://example.com/docs/api")
         assert api_page["title"] == "API Reference"
+        assert plan["project"]["title"] == "Example Docs"
 
         out_dir = tmp / "out"
         run(
@@ -133,9 +140,21 @@ Example Docs is the home for the SDK and API guides.
         assert (out_dir / "ai-content-suggestions.md").exists()
 
         sitemap_plan_json = tmp / "sitemap-plan.json"
-        run(str(SCRIPTS / "crawl_site.py"), "--sitemap", str(sitemap), "--output", str(sitemap_plan_json))
+        run(
+            str(SCRIPTS / "crawl_site.py"),
+            "--sitemap",
+            str(sitemap),
+            "--project-title",
+            "Example Platform",
+            "--project-summary",
+            "Canonical docs for the Example Platform.",
+            "--output",
+            str(sitemap_plan_json),
+        )
         sitemap_plan = json.loads(sitemap_plan_json.read_text(encoding="utf-8"))
         assert sitemap_plan["stats"]["excluded"] == 1
+        assert sitemap_plan["project"]["title"] == "Example Platform"
+        assert sitemap_plan["project"]["summary"] == "Canonical docs for the Example Platform."
 
     print("smoke test passed")
     return 0
