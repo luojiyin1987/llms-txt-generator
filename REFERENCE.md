@@ -4,7 +4,7 @@
 
 ### Website URL
 
-Use the one-shot orchestrator for a stable end-to-end flow. It uses `dokobot` for rendered page reads, respects `robots.txt` by default, cleans markdown, discovers same-site links, and builds final artifacts.
+Use the one-shot orchestrator for a stable end-to-end flow. It uses `dokobot` for rendered page reads, respects `robots.txt` by default, cleans markdown, discovers same-site links, and builds final artifacts. If `robots.txt` cannot be read, the run now fails unless you explicitly pass `--ignore-robots`.
 
 Example:
 
@@ -39,7 +39,7 @@ python3 scripts/crawl_site.py \
 
 ### README
 
-For a GitHub README URL, read it with `dokobot` first or provide a local markdown file. The script treats markdown links as candidate resources.
+For a GitHub README URL or local markdown file, the script reads markdown directly. GitHub repo URLs and `blob/.../README.md` URLs are resolved to raw markdown automatically. When no explicit allowed domains are provided, README mode keeps only high-confidence docs links instead of blindly restricting everything to `github.com`.
 
 ### docs directory
 
