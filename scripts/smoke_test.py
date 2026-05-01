@@ -28,6 +28,10 @@ def run(*args: str) -> subprocess.CompletedProcess[str]:
 
 
 def main() -> int:
+    help_result = run(str(SCRIPTS / "generate_llms_txt.py"), "-h")
+    assert "--ignore-robots" in help_result.stdout
+    assert "--with-full" in help_result.stdout
+
     normalized = normalize_url("https://example.com/docs?q=hello world&x=a%26b&utm_source=newsletter")
     assert normalized == "https://example.com/docs?q=hello+world&x=a%26b"
 
