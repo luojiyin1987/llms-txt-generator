@@ -88,7 +88,12 @@ def records_from_sitemap(source: str) -> list[PageRecord]:
 
 
 def records_from_seed_files(seed_files: list[str], site_url: str | None = None) -> list[PageRecord]:
-    payloads = [load_page_json(seed_file) for seed_file in seed_files]
+    payloads: list[dict] = []
+    for seed_file in seed_files:
+        try:
+            payloads.append(load_page_json(seed_file))
+        except Exception as exc:
+            print(f"Warning: unable to load seed file {seed_file}: {exc}", file=sys.stderr)
     return records_from_seed_payloads(payloads, site_url=site_url)
 
 
