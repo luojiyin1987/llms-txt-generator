@@ -36,9 +36,9 @@ If the input includes a live website, use the `dokobot` skill for page reads. Do
 1. Detect the source mode: site, sitemap, README, or docs directory.
 2. For live sites, use `dokobot` to read the homepage, docs landing page, nav pages, and key API/reference pages.
 3. Run `scripts/clean_markdown.py` on each fetched page to normalize content and extract links.
-4. Run `scripts/crawl_site.py` to build a curated page plan with include/optional/exclude decisions.
-5. If `llms-full.txt` is requested, fetch the included pages with `dokobot`, clean them, and keep only high-signal docs content.
-6. Run `scripts/build_llms_txt.py` to emit final artifacts.
+4. Prefer `scripts/generate_llms_txt.py` for end-to-end runs. It drives `dokobot`, respects `robots.txt` by default, cleans pages, discovers same-site links, and emits final artifacts.
+5. Use `scripts/crawl_site.py` directly when you only need the crawl/plan phase.
+6. If `llms-full.txt` is requested, the orchestration flow reuses the cleaned crawled pages when available.
 
 ## Hard filters
 
@@ -52,6 +52,7 @@ Always exclude:
 ## Quick commands
 
 ```bash
+python3 scripts/generate_llms_txt.py -h
 python3 scripts/crawl_site.py -h
 python3 scripts/clean_markdown.py -h
 python3 scripts/build_llms_txt.py -h
