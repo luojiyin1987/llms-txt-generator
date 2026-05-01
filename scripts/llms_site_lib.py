@@ -368,7 +368,12 @@ def group_records(records: Iterable[PageRecord]) -> dict[str, list[PageRecord]]:
 
 
 def parse_sitemap_xml(text: str) -> list[str]:
-    root = ET.fromstring(text)
+    try:
+        root = ET.fromstring(text)
+    except Exception as exc:
+        import sys
+        print(f"Warning: unable to parse sitemap XML: {exc}", file=sys.stderr)
+        return []
     namespace = ""
     if root.tag.startswith("{"):
         namespace = root.tag.split("}", 1)[0] + "}"
