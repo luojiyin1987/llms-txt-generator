@@ -302,11 +302,20 @@ def classification_text(target: str, title: str) -> str:
 
 
 def should_exclude_target(target: str, title: str = "") -> tuple[bool, str]:
-    haystack = f"{target} {title}".lower()
+    parsed = urlparse(target) if is_url(target) else None
+
+    # Check hostname segments separately to avoid false positives on subdomains.
+    # e.g. auth.example.com should NOT match the "auth" exclude token.
+    if parsed and parsed.hostname:
+        hostname_segments = set(parsed.hostname.lower().split("."))
+        for token in EXCLUDE_TOKEN_PATTERNS:
+            if token in hostname_segments:
+                return True, "matched excluded token in hostname"
+
+    haystack = f"{parsed.path if parsed else target} {parsed.query if parsed else ''} {title}".lower()
     if any(token in haystack for token in EXCLUDE_TOKEN_PATTERNS):
         return True, "matched excluded token"
 
-    parsed = urlparse(target) if is_url(target) else None
     if parsed:
         query = parse_qs(parsed.query)
         if any(key.lower() in {"page", "offset", "cursor", "before", "after"} for key in query):
