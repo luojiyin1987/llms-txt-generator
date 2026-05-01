@@ -209,9 +209,8 @@ def clean_markdown_text(raw_text: str) -> str:
         if maybe_drop_noise_line(line):
             continue
         line = re.sub(r"[ \t]+$", "", line)
-        if re.fullmatch(r"[-=]{3,}", line.strip()):
-            if cleaned and cleaned[-1].startswith("#"):
-                continue
+        if re.fullmatch(r"[-=]{3,}", line.strip()) and cleaned and cleaned[-1].startswith("#"):
+            continue
         blank = not line.strip()
         if blank and previous_blank:
             continue
