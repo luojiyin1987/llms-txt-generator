@@ -513,12 +513,13 @@ def description_quality(description: str) -> int:
 
 
 def record_priority(record: PageRecord) -> tuple[int, int, int, int, int]:
+    src_prio = max(SOURCE_PRIORITY.get(s, 0) for s in record.source.split(","))
     return (
-        DECISION_PRIORITY.get(record.decision, 0),
+        src_prio,
         description_quality(record.description),
         title_quality(record.title, record.target),
+        DECISION_PRIORITY.get(record.decision, 0),
         SECTION_PRIORITY.get(record.section, 0),
-        SOURCE_PRIORITY.get(record.source, 0),
     )
 
 
