@@ -30,3 +30,5 @@ python3 scripts/generate_llms_txt.py \
 ```
 
 See [REFERENCE.md](REFERENCE.md) for end-to-end examples, including the required `dokobot` step for live site crawling.
+
+The live URL flow requires a working `dokobot` CLI and browser setup. By default it stops if `robots.txt` cannot be read; use `--ignore-robots` only when you intentionally want to override that check.
