@@ -38,6 +38,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--allow-domain", action="append", default=[], help="Additional allowed domain. Can be passed more than once.")
     parser.add_argument("--base-url", help="Base URL used to resolve relative links.")
     parser.add_argument("--repo-url", help="Repo URL used to map local docs paths to blob URLs.")
+    parser.add_argument("--project-title", help="Explicit project title used as the llms.txt H1.")
+    parser.add_argument("--project-summary", help="Explicit project summary used as the llms.txt blockquote.")
     parser.add_argument("--output", help="Write plan JSON to this path.")
     return parser.parse_args()
 
@@ -216,6 +218,58 @@ def enrich_descriptions(records: list[PageRecord], seed_files: list[str]) -> lis
     return enriched
 
 
+PROJECT_SOURCE_PRIORITY = {
+    "site-url": 6,
+    "readme": 5,
+    "docs-dir": 5,
+    "seed-page": 4,
+    "readme-link": 3,
+    "docs-link": 3,
+    "seed-link": 2,
+    "sitemap": 1,
+}
+
+
+def title_quality(title: str) -> int:
+    if not title or title in {"Home", "Untitled"}:
+        return 0
+    score = 1
+    if " " in title:
+        score += 1
+    if len(title) > 8:
+        score += 1
+    return score
+
+
+def summary_quality(summary: str) -> int:
+    if not summary:
+        return 0
+    return min(len(summary.strip()), 240)
+
+
+def source_priority(record: PageRecord) -> int:
+    return max(PROJECT_SOURCE_PRIORITY.get(source, 0) for source in record.source.split(","))
+
+
+def infer_project_metadata(records: list[PageRecord]) -> tuple[str, str]:
+    include_records = [record for record in records if record.decision == "include"]
+    candidates = include_records or records
+
+    title = "Generated llms.txt"
+    title_candidates = [record for record in candidates if title_quality(record.title) > 0]
+    if title_candidates:
+        best_title_record = max(title_candidates, key=lambda record: (source_priority(record), title_quality(record.title), summary_quality(record.description)))
+        title = best_title_record.title
+
+    summary = "Curated documentation map for LLM consumption."
+    summary_candidates = [record for record in candidates if summary_quality(record.description) > 0]
+    if summary_candidates:
+        best_summary_record = max(summary_candidates, key=lambda record: (source_priority(record), summary_quality(record.description), title_quality(record.title)))
+        summary = best_summary_record.description
+
+    return title, summary
+
+
 def build_payload(args: argparse.Namespace) -> dict:
     if args.sitemap:
         source_kind = "sitemap"
@@ -256,16 +310,9 @@ def build_payload(args: argparse.Namespace) -> dict:
     optional = [record for record in records if record.decision == "optional"]
     excluded = [record for record in records if record.decision == "exclude"]
 
-    title = "Generated llms.txt"
-    summary = "Curated documentation map for LLM consumption."
-    for record in records:
-        if record.decision == "include" and record.description:
-            summary = record.description
-            break
-    for record in records:
-        if record.title and record.title not in {"Home", "Untitled"}:
-            title = record.title
-            break
+    inferred_title, inferred_summary = infer_project_metadata(records)
+    title = args.project_title or inferred_title
+    summary = args.project_summary or inferred_summary
 
     payload = {
         "source": {
