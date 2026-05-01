@@ -8,6 +8,7 @@ import json
 import subprocess
 from collections import deque
 from pathlib import Path
+from urllib.parse import urlparse
 
 from llms_site_lib import (
     PageRecord,
@@ -27,6 +28,7 @@ from llms_site_lib import (
     normalize_url,
     parse_sitemap_xml,
     read_text_source,
+    resolve_readme_source,
     safe_filename,
     summarize_content,
     unique_records,
@@ -208,7 +210,7 @@ def crawl_live_site(args: argparse.Namespace, allowed_hosts: set[str]) -> tuple[
 
 
 def records_from_readme(source: str, base_url: str | None = None) -> list[PageRecord]:
-    text = read_text_source(source)
+    text = read_text_source(resolve_readme_source(source))
     title, summary = extract_title_and_summary(text)
     records: list[PageRecord] = [
         PageRecord(
@@ -235,6 +237,24 @@ def records_from_readme(source: str, base_url: str | None = None) -> list[PageRe
             )
         )
     return records
+
+
+def keep_readme_link_record(record: PageRecord) -> bool:
+    if record.source != "readme-link":
+        return True
+    if record.decision == "exclude":
+        return False
+    if is_url(record.target):
+        parsed = urlparse(record.target)
+        host = (parsed.hostname or "").lower()
+        path_parts = [part.lower() for part in parsed.path.split("/") if part]
+        if host in {"github.com", "gitlab.com"} and any(part in {"issues", "pull", "pulls", "discussions", "actions", "compare"} for part in path_parts):
+            return False
+    if record.decision == "optional":
+        return True
+    if record.section in {"API", "Guides", "Getting Started", "Examples"}:
+        return True
+    return record.reason == "generic docs signal"
 
 
 def records_from_docs_dir(directory: str, base_url: str | None = None, repo_url: str | None = None) -> list[PageRecord]:
@@ -389,6 +409,13 @@ def build_payload(args: argparse.Namespace) -> dict:
         records.extend(records_from_seed_files(args.seed_file))
     if args.seed_file:
         records = enrich_descriptions(records, args.seed_file)
+    if source_kind == "readme" and not allowed_hosts:
+        records = [record for record in records if keep_readme_link_record(record)]
+        allowed_hosts = {
+            hostname_of(record.target)
+            for record in records
+            if is_url(record.target)
+        }
     if source_kind == "sitemap" and not allowed_hosts:
         allowed_hosts = {
             hostname_of(record.target)
