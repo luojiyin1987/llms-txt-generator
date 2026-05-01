@@ -14,7 +14,9 @@ ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from llms_site_lib import PageRecord, classify_target, normalize_url, unique_records
+from unittest import mock
+
+from llms_site_lib import PageRecord, build_robots_parser, classify_target, normalize_url, resolve_readme_source, unique_records
 
 
 def run(*args: str) -> subprocess.CompletedProcess[str]:
@@ -67,6 +69,17 @@ def main() -> int:
     apidoc_classification = classify_target("https://example.com/apidoc", title="Apidoc")
     assert apidoc_classification[0] != "API" or apidoc_classification[2] != "matched core section token"
 
+    assert resolve_readme_source("https://github.com/example/project") == "https://raw.githubusercontent.com/example/project/HEAD/README.md"
+    assert resolve_readme_source("https://github.com/example/project/blob/main/README.md") == "https://raw.githubusercontent.com/example/project/main/README.md"
+
+    with mock.patch("urllib.robotparser.RobotFileParser.read", side_effect=OSError("network down")):
+        try:
+            build_robots_parser("https://example.com/docs")
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("expected robots parser failure to raise")
+
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp = Path(tmpdir)
         raw_page = tmp / "home.md"
@@ -86,11 +99,30 @@ Example Docs is the home for the SDK and API guides.
             encoding="utf-8",
         )
 
+        readme = tmp / "README.md"
+        readme.write_text(
+            """# SDK
+
+See the docs:
+
+- [Docs Home](https://docs.example.com/docs)
+- [API Reference](https://docs.example.com/api/reference)
+- [Issues](https://github.com/example/project/issues)
+""",
+            encoding="utf-8",
+        )
+
         cleaned_json = tmp / "home.json"
         run(str(SCRIPTS / "clean_markdown.py"), str(raw_page), "--source-url", "https://example.com/docs", "--json-out", str(cleaned_json))
         cleaned = json.loads(cleaned_json.read_text(encoding="utf-8"))
         assert cleaned["title"] == "Example Docs"
         assert cleaned["stats"]["link_count"] == 5
+
+        readme_plan_json = tmp / "readme-plan.json"
+        run(str(SCRIPTS / "crawl_site.py"), "--readme", str(readme), "--output", str(readme_plan_json))
+        readme_plan = json.loads(readme_plan_json.read_text(encoding="utf-8"))
+        assert any(page["target"] == "https://docs.example.com/docs" for page in readme_plan["pages"])
+        assert all("github.com/example/project/issues" not in page["target"] for page in readme_plan["pages"])
 
         sitemap = tmp / "sitemap.xml"
         sitemap.write_text(
@@ -132,16 +164,47 @@ Example Docs is the home for the SDK and API guides.
             str(tmp),
             "--output-dir",
             str(out_dir),
-            "--with-full",
             "--with-sitemap-summary",
             "--with-ai-suggestions",
         )
         llms_txt = (out_dir / "llms.txt").read_text(encoding="utf-8")
         assert "# Example Docs" in llms_txt
         assert "## API" in llms_txt or "## Docs" in llms_txt
-        assert (out_dir / "llms-full.txt").exists()
         assert (out_dir / "sitemap-summary.md").exists()
         assert (out_dir / "ai-content-suggestions.md").exists()
+
+        docs_dir = tmp / "docs"
+        docs_dir.mkdir()
+        (docs_dir / "index.md").write_text(
+            """# Local Docs
+
+Start here.
+
+- [Guide](guide.md)
+""",
+            encoding="utf-8",
+        )
+        (docs_dir / "guide.md").write_text(
+            """# Guide
+
+This is the full guide body.
+""",
+            encoding="utf-8",
+        )
+        generated_out = tmp / "generated-out"
+        artifacts = tmp / "generated-artifacts"
+        run(
+            str(SCRIPTS / "generate_llms_txt.py"),
+            "--docs-dir",
+            str(docs_dir),
+            "--output-dir",
+            str(generated_out),
+            "--artifacts-dir",
+            str(artifacts),
+            "--with-full",
+        )
+        llms_full = (generated_out / "llms-full.txt").read_text(encoding="utf-8")
+        assert "This is the full guide body." in llms_full
 
         sitemap_plan_json = tmp / "sitemap-plan.json"
         run(
