@@ -427,10 +427,7 @@ def build_robots_parser(site_url: str) -> RobotFileParser:
 def can_fetch_with_robots(parser: RobotFileParser | None, url: str, user_agent: str = "llms-txt-generator") -> bool:
     if parser is None:
         return True
-    try:
-        return parser.can_fetch(user_agent, url)
-    except Exception:
-        return True
+    return parser.can_fetch(user_agent, url)
 
 
 def hostname_of(value: str) -> str:
