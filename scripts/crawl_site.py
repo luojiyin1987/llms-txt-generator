@@ -44,8 +44,12 @@ def parse_args() -> argparse.Namespace:
     group.add_argument("--sitemap", help="Sitemap URL or local XML file.")
     group.add_argument("--readme", help="README markdown file or URL.")
     group.add_argument("--docs-dir", help="Local docs directory containing markdown files.")
-    parser.add_argument("--seed-file", action="append", default=[], help="Cleaned page JSON file(s) from clean_markdown.py.")
-    parser.add_argument("--allow-domain", action="append", default=[], help="Additional allowed domain. Can be passed more than once.")
+    parser.add_argument(
+        "--seed-file", action="append", default=[], help="Cleaned page JSON file(s) from clean_markdown.py."
+    )
+    parser.add_argument(
+        "--allow-domain", action="append", default=[], help="Additional allowed domain. Can be passed more than once."
+    )
     parser.add_argument("--base-url", help="Base URL used to resolve relative links.")
     parser.add_argument("--repo-url", help="Repo URL used to map local docs paths to blob URLs.")
     parser.add_argument("--project-title", help="Explicit project title used as the llms.txt H1.")
@@ -150,7 +154,16 @@ def records_from_seed_payloads(seed_payloads: list[dict], site_url: str | None =
 
 
 def read_with_dokobot(url: str, args: argparse.Namespace) -> str:
-    command = [args.dokobot_command, "doko", "read", url, "--timeout", str(args.dokobot_timeout), "--screens", str(args.dokobot_screens)]
+    command = [
+        args.dokobot_command,
+        "doko",
+        "read",
+        url,
+        "--timeout",
+        str(args.dokobot_timeout),
+        "--screens",
+        str(args.dokobot_screens),
+    ]
     if args.dokobot_local:
         command.append("--local")
     result = subprocess.run(command, check=True, capture_output=True, text=True)
@@ -207,7 +220,17 @@ def crawl_live_site(args: argparse.Namespace, allowed_hosts: set[str]) -> tuple[
             if not target or target in seen or target in queue:
                 continue
             if not filter_records_by_hosts(
-                [PageRecord(target=target, title="", description="", section="", decision="include", reason="", source="crawl-link")],
+                [
+                    PageRecord(
+                        target=target,
+                        title="",
+                        description="",
+                        section="",
+                        decision="include",
+                        reason="",
+                        source="crawl-link",
+                    )
+                ],
                 allowed_hosts,
             )[0]:
                 continue
@@ -262,7 +285,9 @@ def keep_readme_link_record(record: PageRecord) -> bool:
         parsed = urlparse(record.target)
         host = (parsed.hostname or "").lower()
         path_parts = [part.lower() for part in parsed.path.split("/") if part]
-        if host in {"github.com", "gitlab.com"} and any(part in {"issues", "pull", "pulls", "discussions", "actions", "compare"} for part in path_parts):
+        if host in {"github.com", "gitlab.com"} and any(
+            part in {"issues", "pull", "pulls", "discussions", "actions", "compare"} for part in path_parts
+        ):
             return False
     return True
 
@@ -376,13 +401,27 @@ def infer_project_metadata(records: list[PageRecord]) -> tuple[str, str]:
     title = "Generated llms.txt"
     title_candidates = [record for record in candidates if title_quality(record.title) > 0]
     if title_candidates:
-        best_title_record = max(title_candidates, key=lambda record: (source_priority(record), title_quality(record.title), summary_quality(record.description)))
+        best_title_record = max(
+            title_candidates,
+            key=lambda record: (
+                source_priority(record),
+                title_quality(record.title),
+                summary_quality(record.description),
+            ),
+        )
         title = best_title_record.title
 
     summary = "Curated documentation map for LLM consumption."
     summary_candidates = [record for record in candidates if summary_quality(record.description) > 0]
     if summary_candidates:
-        best_summary_record = max(summary_candidates, key=lambda record: (source_priority(record), summary_quality(record.description), title_quality(record.title)))
+        best_summary_record = max(
+            summary_candidates,
+            key=lambda record: (
+                source_priority(record),
+                summary_quality(record.description),
+                title_quality(record.title),
+            ),
+        )
         summary = best_summary_record.description
 
     return title, summary
@@ -421,17 +460,9 @@ def build_payload(args: argparse.Namespace) -> dict:
         records = enrich_descriptions(records, args.seed_file)
     if source_kind == "readme" and not allowed_hosts:
         records = [record for record in records if keep_readme_link_record(record)]
-        allowed_hosts = {
-            hostname_of(record.target)
-            for record in records
-            if is_url(record.target)
-        }
+        allowed_hosts = {hostname_of(record.target) for record in records if is_url(record.target)}
     if source_kind == "sitemap" and not allowed_hosts:
-        allowed_hosts = {
-            hostname_of(record.target)
-            for record in records
-            if is_url(record.target)
-        }
+        allowed_hosts = {hostname_of(record.target) for record in records if is_url(record.target)}
     records, dropped_records = filter_records_by_hosts(records, allowed_hosts)
     records = unique_records(records)
     grouped = group_records(records)

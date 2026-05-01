@@ -75,8 +75,14 @@ def main() -> int:
     apidoc_classification = classify_target("https://example.com/apidoc", title="Apidoc")
     assert apidoc_classification[0] != "API" or apidoc_classification[2] != "matched core section token"
 
-    assert resolve_readme_source("https://github.com/example/project") == "https://raw.githubusercontent.com/example/project/HEAD/README.md"
-    assert resolve_readme_source("https://github.com/example/project/blob/main/README.md") == "https://raw.githubusercontent.com/example/project/main/README.md"
+    assert (
+        resolve_readme_source("https://github.com/example/project")
+        == "https://raw.githubusercontent.com/example/project/HEAD/README.md"
+    )
+    assert (
+        resolve_readme_source("https://github.com/example/project/blob/main/README.md")
+        == "https://raw.githubusercontent.com/example/project/main/README.md"
+    )
 
     with mock.patch("urllib.robotparser.RobotFileParser.read", side_effect=OSError("network down")):
         parser = build_robots_parser("https://example.com/docs")
@@ -115,7 +121,14 @@ See the docs:
         )
 
         cleaned_json = tmp / "home.json"
-        run(str(SCRIPTS / "clean_markdown.py"), str(raw_page), "--source-url", "https://example.com/docs", "--json-out", str(cleaned_json))
+        run(
+            str(SCRIPTS / "clean_markdown.py"),
+            str(raw_page),
+            "--source-url",
+            "https://example.com/docs",
+            "--json-out",
+            str(cleaned_json),
+        )
         cleaned = json.loads(cleaned_json.read_text(encoding="utf-8"))
         assert cleaned["title"] == "Example Docs"
         assert cleaned["stats"]["link_count"] == 5

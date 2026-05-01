@@ -37,7 +37,9 @@ def parse_args() -> argparse.Namespace:
     group.add_argument("--docs-dir", help="Local docs directory containing markdown files.")
     parser.add_argument("--output-dir", default="out", help="Final output directory.")
     parser.add_argument("--artifacts-dir", default="artifacts", help="Intermediate artifact directory.")
-    parser.add_argument("--allow-domain", action="append", default=[], help="Additional allowed domain. Can be passed more than once.")
+    parser.add_argument(
+        "--allow-domain", action="append", default=[], help="Additional allowed domain. Can be passed more than once."
+    )
     parser.add_argument("--base-url", help="Base URL used to resolve relative links.")
     parser.add_argument("--repo-url", help="Repo URL used to map local docs paths to blob URLs.")
     parser.add_argument("--project-title", help="Explicit project title used as the llms.txt H1.")
@@ -80,7 +82,9 @@ def seed_docs_dir_payloads(args: argparse.Namespace, page_json_dir: Path, existi
     docs_path = Path(args.docs_dir)
     next_index = len(existing) + 1
     for path in sorted(docs_path.rglob("*.md")):
-        target = infer_target_from_markdown_path(path.relative_to(docs_path), base_url=args.base_url, repo_url=args.repo_url)
+        target = infer_target_from_markdown_path(
+            path.relative_to(docs_path), base_url=args.base_url, repo_url=args.repo_url
+        )
         normalized_target = normalize_url(target)
         if normalized_target in existing:
             continue
@@ -158,13 +162,37 @@ def main() -> int:
     plan_path.parent.mkdir(parents=True, exist_ok=True)
 
     crawl_cmd = [sys.executable, str(SCRIPTS / "crawl_site.py")]
-    for name in ("site_url", "sitemap", "readme", "docs_dir", "base_url", "repo_url", "project_title", "project_summary"):
+    for name in (
+        "site_url",
+        "sitemap",
+        "readme",
+        "docs_dir",
+        "base_url",
+        "repo_url",
+        "project_title",
+        "project_summary",
+    ):
         value = getattr(args, name)
         if value:
             crawl_cmd.extend([f"--{name.replace('_', '-')}", value])
     for domain in args.allow_domain:
         crawl_cmd.extend(["--allow-domain", domain])
-    crawl_cmd.extend(["--page-json-dir", str(page_json_dir), "--max-pages", str(args.max_pages), "--dokobot-command", args.dokobot_command, "--dokobot-timeout", str(args.dokobot_timeout), "--dokobot-screens", str(args.dokobot_screens), "--output", str(plan_path)])
+    crawl_cmd.extend(
+        [
+            "--page-json-dir",
+            str(page_json_dir),
+            "--max-pages",
+            str(args.max_pages),
+            "--dokobot-command",
+            args.dokobot_command,
+            "--dokobot-timeout",
+            str(args.dokobot_timeout),
+            "--dokobot-screens",
+            str(args.dokobot_screens),
+            "--output",
+            str(plan_path),
+        ]
+    )
     if args.dokobot_local:
         crawl_cmd.append("--dokobot-local")
     if args.ignore_robots:
@@ -175,7 +203,16 @@ def main() -> int:
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
         ensure_full_payloads(plan, args, page_json_dir)
 
-    build_cmd = [sys.executable, str(SCRIPTS / "build_llms_txt.py"), "--plan", str(plan_path), "--page-json-dir", str(page_json_dir), "--output-dir", args.output_dir]
+    build_cmd = [
+        sys.executable,
+        str(SCRIPTS / "build_llms_txt.py"),
+        "--plan",
+        str(plan_path),
+        "--page-json-dir",
+        str(page_json_dir),
+        "--output-dir",
+        args.output_dir,
+    ]
     if args.with_full:
         build_cmd.append("--with-full")
     if args.with_sitemap_summary:
@@ -185,7 +222,14 @@ def main() -> int:
     run_command(build_cmd)
 
     plan = json.loads(plan_path.read_text(encoding="utf-8"))
-    sys.stdout.write(json.dumps({"plan": str(plan_path), "output_dir": args.output_dir, "stats": plan.get("stats", {})}, ensure_ascii=False, indent=2) + "\n")
+    sys.stdout.write(
+        json.dumps(
+            {"plan": str(plan_path), "output_dir": args.output_dir, "stats": plan.get("stats", {})},
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n"
+    )
     return 0
 
 

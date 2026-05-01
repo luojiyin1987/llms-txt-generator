@@ -55,7 +55,9 @@ def render_llms_txt(plan: dict) -> str:
         [
             section
             for section, items in sections.items()
-            if section not in ordered_sections and section != "Optional" and any(page["decision"] == "include" for page in items)
+            if section not in ordered_sections
+            and section != "Optional"
+            and any(page["decision"] == "include" for page in items)
         ]
     )
     ordered_sections.extend(remaining)
@@ -71,7 +73,9 @@ def render_llms_txt(plan: dict) -> str:
     optional_pages = [page for page in plan["pages"] if page["decision"] == "optional"]
     if optional_pages:
         lines.extend(["", "## Optional", ""])
-        for page in sorted(optional_pages, key=lambda item: (item["section"], item["title"].lower(), item["target"].lower())):
+        for page in sorted(
+            optional_pages, key=lambda item: (item["section"], item["title"].lower(), item["target"].lower())
+        ):
             desc = f": {page['description']}" if page["description"] else ""
             lines.append(f"- [{page['title']}]({page['target']}){desc}")
 
@@ -100,7 +104,10 @@ def render_llms_full(plan: dict, page_map: dict[str, dict], llms_txt: str) -> st
         )
     if missing_targets:
         import sys
-        print("Warning: missing cleaned page payloads for llms-full.txt: " + ", ".join(missing_targets), file=sys.stderr)
+
+        print(
+            "Warning: missing cleaned page payloads for llms-full.txt: " + ", ".join(missing_targets), file=sys.stderr
+        )
     return "\n".join(lines).rstrip() + "\n"
 
 

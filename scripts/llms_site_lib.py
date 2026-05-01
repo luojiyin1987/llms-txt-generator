@@ -370,6 +370,7 @@ def parse_sitemap_xml(text: str) -> list[str]:
         root = ET.fromstring(text)
     except Exception as exc:
         import sys
+
         print(f"Warning: unable to parse sitemap XML: {exc}", file=sys.stderr)
         return []
     namespace = ""
@@ -459,7 +460,9 @@ def target_is_allowed(target: str, allowed_hosts: set[str]) -> bool:
     return any(hostname == allowed or hostname.endswith(f".{allowed}") for allowed in allowed_hosts)
 
 
-def filter_records_by_hosts(records: Iterable[PageRecord], allowed_hosts: set[str]) -> tuple[list[PageRecord], list[PageRecord]]:
+def filter_records_by_hosts(
+    records: Iterable[PageRecord], allowed_hosts: set[str]
+) -> tuple[list[PageRecord], list[PageRecord]]:
     kept: list[PageRecord] = []
     dropped: list[PageRecord] = []
     for record in records:
@@ -496,7 +499,13 @@ def title_quality(title: str, target: str) -> int:
     clean = collapse_ws(title)
     if not clean or clean in {"Home", "Untitled"}:
         return 0
-    slug = Path(urlparse(target).path if is_url(target) else target).name.replace("-", " ").replace("_", " ").strip().lower()
+    slug = (
+        Path(urlparse(target).path if is_url(target) else target)
+        .name.replace("-", " ")
+        .replace("_", " ")
+        .strip()
+        .lower()
+    )
     score = 1
     if clean.lower() != slug:
         score += 2
