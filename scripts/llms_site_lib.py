@@ -121,6 +121,28 @@ def read_text_source(source: str) -> str:
     return Path(source).read_text(encoding="utf-8")
 
 
+def resolve_readme_source(source: str) -> str:
+    if not is_url(source):
+        return source
+
+    parsed = urlparse(source)
+    host = (parsed.hostname or "").lower()
+    parts = [part for part in parsed.path.split("/") if part]
+    if host == "raw.githubusercontent.com":
+        return source
+    if host != "github.com" or len(parts) < 2:
+        return source
+
+    owner, repo = parts[0], parts[1]
+    if len(parts) == 2:
+        return f"https://raw.githubusercontent.com/{owner}/{repo}/HEAD/README.md"
+    if len(parts) >= 5 and parts[2] == "blob":
+        branch = parts[3]
+        path = "/".join(parts[4:])
+        return f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}"
+    return source
+
+
 def write_text(path: str | Path, content: str) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -272,6 +294,13 @@ def keyword_matches_terms(keyword: str, terms: set[str]) -> bool:
     return bool(parts) and all(part in terms for part in parts)
 
 
+def classification_text(target: str, title: str) -> str:
+    if is_url(target):
+        parsed = urlparse(target)
+        return f"{parsed.path} {parsed.query} {title}".strip()
+    return f"{target} {title}".strip()
+
+
 def should_exclude_target(target: str, title: str = "") -> tuple[bool, str]:
     haystack = f"{target} {title}".lower()
     if any(token in haystack for token in EXCLUDE_TOKEN_PATTERNS):
@@ -294,8 +323,8 @@ def classify_target(target: str, title: str = "") -> tuple[str, str, str]:
     if excluded:
         return "Excluded", "exclude", reason
 
-    haystack = f"{target} {title}".lower()
-    terms = normalized_terms(target, title)
+    haystack = classification_text(target, title).lower()
+    terms = normalized_terms(classification_text(target, title))
     if any(token in haystack for token in OPTIONAL_TOKEN_PATTERNS):
         return "Optional", "optional", "secondary content"
 
@@ -381,8 +410,8 @@ def build_robots_parser(site_url: str) -> RobotFileParser:
     parser.set_url(robots_url)
     try:
         parser.read()
-    except Exception:
-        parser.allow_all = True
+    except Exception as exc:
+        raise RuntimeError(f"Unable to read robots.txt from {robots_url}") from exc
     return parser
 
 
