@@ -131,7 +131,12 @@ def ensure_full_payloads(plan: dict, args: argparse.Namespace, page_json_dir: Pa
                 missing.append(target)
                 continue
 
-        raw_text = read_with_dokobot(target, args)
+        try:
+            raw_text = read_with_dokobot(target, args)
+        except subprocess.CalledProcessError as exc:
+            print(f"Warning: dokobot failed for {target}: {exc}", file=sys.stderr)
+            missing.append(target)
+            continue
         if not raw_text.strip():
             missing.append(target)
             continue
