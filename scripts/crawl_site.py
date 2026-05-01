@@ -9,9 +9,12 @@ from pathlib import Path
 from llms_site_lib import (
     PageRecord,
     classify_target,
+    derive_allowed_hosts,
     extract_markdown_links,
     extract_title_and_summary,
+    filter_records_by_hosts,
     group_records,
+    hostname_of,
     infer_target_from_markdown_path,
     is_url,
     load_page_json,
@@ -32,6 +35,7 @@ def parse_args() -> argparse.Namespace:
     group.add_argument("--readme", help="README markdown file or URL.")
     group.add_argument("--docs-dir", help="Local docs directory containing markdown files.")
     parser.add_argument("--seed-file", action="append", default=[], help="Cleaned page JSON file(s) from clean_markdown.py.")
+    parser.add_argument("--allow-domain", action="append", default=[], help="Additional allowed domain. Can be passed more than once.")
     parser.add_argument("--base-url", help="Base URL used to resolve relative links.")
     parser.add_argument("--repo-url", help="Repo URL used to map local docs paths to blob URLs.")
     parser.add_argument("--output", help="Write plan JSON to this path.")
@@ -231,6 +235,20 @@ def build_payload(args: argparse.Namespace) -> dict:
     if args.seed_file:
         records = enrich_descriptions(records, args.seed_file)
 
+    allowed_hosts = derive_allowed_hosts(
+        args.site_url,
+        args.base_url,
+        args.readme if is_url(args.readme or "") else None,
+        args.repo_url,
+        allow_domains=args.allow_domain,
+    )
+    if source_kind == "sitemap" and not allowed_hosts:
+        allowed_hosts = {
+            hostname_of(record.target)
+            for record in records
+            if is_url(record.target)
+        }
+    records, dropped_records = filter_records_by_hosts(records, allowed_hosts)
     records = unique_records(records)
     grouped = group_records(records)
 
@@ -263,7 +281,9 @@ def build_payload(args: argparse.Namespace) -> dict:
             "included": len(included),
             "optional": len(optional),
             "excluded": len(excluded),
+            "dropped_external": len(dropped_records),
         },
+        "allowed_hosts": sorted(allowed_hosts),
         "pages": [record.to_dict() for record in records],
         "sections": {section: [record.to_dict() for record in items] for section, items in grouped.items()},
     }
