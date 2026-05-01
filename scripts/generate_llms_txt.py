@@ -9,6 +9,21 @@ import subprocess
 import sys
 from pathlib import Path
 
+from crawl_site import read_with_dokobot
+from llms_site_lib import (
+    build_clean_page_payload,
+    build_robots_parser,
+    can_fetch_with_robots,
+    infer_target_from_markdown_path,
+    is_url,
+    load_page_json,
+    normalize_url,
+    read_text_source,
+    resolve_readme_source,
+    safe_filename,
+    write_json,
+)
+
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = Path(__file__).resolve().parent
@@ -45,6 +60,91 @@ def run_command(args: list[str]) -> None:
     subprocess.run(args, cwd=ROOT, check=True)
 
 
+def load_existing_payloads(page_json_dir: Path) -> dict[str, dict]:
+    page_map: dict[str, dict] = {}
+    for path in sorted(page_json_dir.glob("*.json")):
+        payload = load_page_json(path)
+        source_url = normalize_url(payload.get("source_url", ""))
+        if source_url:
+            page_map[source_url] = payload
+    return page_map
+
+
+def write_payload(page_json_dir: Path, payload: dict, index: int) -> None:
+    filename = safe_filename(payload.get("title") or payload.get("source_url", "page"))
+    write_json(page_json_dir / f"{index:03d}-{filename}.json", payload)
+
+
+def seed_docs_dir_payloads(args: argparse.Namespace, page_json_dir: Path, existing: dict[str, dict]) -> None:
+    if not args.docs_dir:
+        return
+    docs_path = Path(args.docs_dir)
+    next_index = len(existing) + 1
+    for path in sorted(docs_path.rglob("*.md")):
+        target = infer_target_from_markdown_path(path.relative_to(docs_path), base_url=args.base_url, repo_url=args.repo_url)
+        normalized_target = normalize_url(target)
+        if normalized_target in existing:
+            continue
+        text = path.read_text(encoding="utf-8")
+        payload = build_clean_page_payload(text, normalized_target or path.as_posix(), source="docs-dir")
+        existing[normalized_target] = payload
+        write_payload(page_json_dir, payload, next_index)
+        next_index += 1
+
+
+def seed_readme_payload(args: argparse.Namespace, page_json_dir: Path, existing: dict[str, dict]) -> None:
+    if not args.readme:
+        return
+    target = normalize_url(args.readme, base_url=args.base_url)
+    if target in existing:
+        return
+    text = read_text_source(resolve_readme_source(args.readme))
+    payload = build_clean_page_payload(text, target or args.readme, source="readme")
+    existing[target] = payload
+    write_payload(page_json_dir, payload, len(existing))
+
+
+def ensure_full_payloads(plan: dict, args: argparse.Namespace, page_json_dir: Path) -> None:
+    existing = load_existing_payloads(page_json_dir)
+    seed_docs_dir_payloads(args, page_json_dir, existing)
+    seed_readme_payload(args, page_json_dir, existing)
+
+    robots_cache: dict[str, object] = {}
+    missing: list[str] = []
+    next_index = len(existing) + 1
+
+    for page in plan["pages"]:
+        if page["decision"] not in {"include", "optional"}:
+            continue
+        target = normalize_url(page["target"])
+        if target in existing:
+            continue
+        if not is_url(target):
+            missing.append(target)
+            continue
+
+        if not args.ignore_robots:
+            host_key = "/".join(target.split("/", 3)[:3])
+            if host_key not in robots_cache:
+                robots_cache[host_key] = build_robots_parser(target)
+            if not can_fetch_with_robots(robots_cache[host_key], target):
+                missing.append(target)
+                continue
+
+        raw_text = read_with_dokobot(target, args)
+        if not raw_text.strip():
+            missing.append(target)
+            continue
+
+        payload = build_clean_page_payload(raw_text, target, source="full-fetch")
+        existing[target] = payload
+        write_payload(page_json_dir, payload, next_index)
+        next_index += 1
+
+    if missing:
+        raise RuntimeError("Unable to prepare llms-full.txt content for: " + ", ".join(missing))
+
+
 def main() -> int:
     args = parse_args()
     artifacts_dir = Path(args.artifacts_dir)
@@ -66,6 +166,10 @@ def main() -> int:
     if args.ignore_robots:
         crawl_cmd.append("--ignore-robots")
     run_command(crawl_cmd)
+
+    if args.with_full:
+        plan = json.loads(plan_path.read_text(encoding="utf-8"))
+        ensure_full_payloads(plan, args, page_json_dir)
 
     build_cmd = [sys.executable, str(SCRIPTS / "build_llms_txt.py"), "--plan", str(plan_path), "--page-json-dir", str(page_json_dir), "--output-dir", args.output_dir]
     if args.with_full:
