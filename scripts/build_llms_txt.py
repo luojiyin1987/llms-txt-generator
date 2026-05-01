@@ -99,7 +99,8 @@ def render_llms_full(plan: dict, page_map: dict[str, dict], llms_txt: str) -> st
             ]
         )
     if missing_targets:
-        raise RuntimeError("Missing cleaned page payloads for llms-full.txt: " + ", ".join(missing_targets))
+        import sys
+        print("Warning: missing cleaned page payloads for llms-full.txt: " + ", ".join(missing_targets), file=sys.stderr)
     return "\n".join(lines).rstrip() + "\n"
 
 

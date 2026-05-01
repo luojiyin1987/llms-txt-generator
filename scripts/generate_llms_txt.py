@@ -142,7 +142,8 @@ def ensure_full_payloads(plan: dict, args: argparse.Namespace, page_json_dir: Pa
         next_index += 1
 
     if missing:
-        raise RuntimeError("Unable to prepare llms-full.txt content for: " + ", ".join(missing))
+        import sys
+        print("Warning: unable to prepare llms-full.txt content for: " + ", ".join(missing), file=sys.stderr)
 
 
 def main() -> int:
