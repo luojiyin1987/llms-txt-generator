@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 from urllib.parse import parse_qs, urlencode, urljoin, urlparse, urlunparse
+from urllib.robotparser import RobotFileParser
 from urllib.request import Request, urlopen
 import xml.etree.ElementTree as ET
 
@@ -130,6 +131,12 @@ def write_json(path: str | Path, payload: dict) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def safe_filename(value: str) -> str:
+    value = re.sub(r"[^a-zA-Z0-9._-]+", "-", value.strip())
+    value = value.strip("-._")
+    return value or "page"
 
 
 def normalize_url(url: str, base_url: str | None = None) -> str:
@@ -347,6 +354,45 @@ def infer_target_from_markdown_path(path: Path, base_url: str | None = None, rep
     if repo_url:
         return normalize_url(rel, base_url=repo_url.rstrip("/") + "/blob/main/")
     return rel
+
+
+def build_clean_page_payload(raw_text: str, source_url: str, source: str = "crawl") -> dict:
+    cleaned = clean_markdown_text(raw_text)
+    title, summary = extract_title_and_summary(cleaned)
+    links = extract_markdown_links(cleaned, base_url=source_url)
+    return {
+        "source": source,
+        "source_url": source_url,
+        "title": title,
+        "summary": summary,
+        "content": cleaned,
+        "links": links,
+        "stats": {
+            "char_count": len(cleaned),
+            "link_count": len(links),
+        },
+    }
+
+
+def build_robots_parser(site_url: str) -> RobotFileParser:
+    parsed = urlparse(site_url)
+    robots_url = f"{parsed.scheme}://{parsed.netloc}/robots.txt"
+    parser = RobotFileParser()
+    parser.set_url(robots_url)
+    try:
+        parser.read()
+    except Exception:
+        parser.allow_all = True
+    return parser
+
+
+def can_fetch_with_robots(parser: RobotFileParser | None, url: str, user_agent: str = "llms-txt-generator") -> bool:
+    if parser is None:
+        return True
+    try:
+        return parser.can_fetch(user_agent, url)
+    except Exception:
+        return True
 
 
 def hostname_of(value: str) -> str:
