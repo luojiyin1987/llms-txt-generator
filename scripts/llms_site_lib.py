@@ -419,8 +419,8 @@ def build_robots_parser(site_url: str) -> RobotFileParser:
     parser.set_url(robots_url)
     try:
         parser.read()
-    except Exception as exc:
-        raise RuntimeError(f"Unable to read robots.txt from {robots_url}") from exc
+    except Exception:
+        parser.allow_all = True
     return parser
 
 

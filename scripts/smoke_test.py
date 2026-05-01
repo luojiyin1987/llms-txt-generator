@@ -73,12 +73,8 @@ def main() -> int:
     assert resolve_readme_source("https://github.com/example/project/blob/main/README.md") == "https://raw.githubusercontent.com/example/project/main/README.md"
 
     with mock.patch("urllib.robotparser.RobotFileParser.read", side_effect=OSError("network down")):
-        try:
-            build_robots_parser("https://example.com/docs")
-        except RuntimeError:
-            pass
-        else:
-            raise AssertionError("expected robots parser failure to raise")
+        parser = build_robots_parser("https://example.com/docs")
+        assert parser.allow_all, "expected fallback to allow_all when robots.txt is unreadable"
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp = Path(tmpdir)
