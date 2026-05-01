@@ -250,11 +250,7 @@ def keep_readme_link_record(record: PageRecord) -> bool:
         path_parts = [part.lower() for part in parsed.path.split("/") if part]
         if host in {"github.com", "gitlab.com"} and any(part in {"issues", "pull", "pulls", "discussions", "actions", "compare"} for part in path_parts):
             return False
-    if record.decision == "optional":
-        return True
-    if record.section in {"API", "Guides", "Getting Started", "Examples"}:
-        return True
-    return record.reason == "generic docs signal"
+    return True
 
 
 def records_from_docs_dir(directory: str, base_url: str | None = None, repo_url: str | None = None) -> list[PageRecord]:
