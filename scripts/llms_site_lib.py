@@ -5,14 +5,13 @@ from __future__ import annotations
 
 import json
 import re
+import xml.etree.ElementTree as ET
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 from urllib.parse import parse_qs, urlencode, urljoin, urlparse, urlunparse
-from urllib.robotparser import RobotFileParser
 from urllib.request import Request, urlopen
-import xml.etree.ElementTree as ET
-
+from urllib.robotparser import RobotFileParser
 
 NOISE_LINE_PATTERNS = [
     re.compile(pattern, re.IGNORECASE)

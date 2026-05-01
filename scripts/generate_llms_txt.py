@@ -24,7 +24,6 @@ from llms_site_lib import (
     write_json,
 )
 
-
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = Path(__file__).resolve().parent
 
