@@ -4,24 +4,26 @@
 
 ### Website URL
 
-Use `dokobot` to read:
-
-- the homepage or docs landing page
-- the primary navigation page
-- one or two representative API/reference pages if the nav exposes them
-
-Then clean each page and let `crawl_site.py` merge the discovered links.
+Use the one-shot orchestrator for a stable end-to-end flow. It uses `dokobot` for rendered page reads, respects `robots.txt` by default, cleans markdown, discovers same-site links, and builds final artifacts.
 
 Example:
 
 ```bash
-dokobot doko read 'https://example.com/docs' --local > artifacts/raw/home.txt
-python3 scripts/clean_markdown.py artifacts/raw/home.txt \
-  --source-url https://example.com/docs \
-  --json-out artifacts/clean/home.json
+python3 scripts/generate_llms_txt.py \
+  --site-url https://example.com/docs \
+  --dokobot-local \
+  --with-full \
+  --with-sitemap-summary \
+  --with-ai-suggestions
+```
+
+If you need just the crawl/plan phase:
+
+```bash
 python3 scripts/crawl_site.py \
   --site-url https://example.com/docs \
-  --seed-file artifacts/clean/home.json \
+  --dokobot-local \
+  --page-json-dir artifacts/clean \
   --output artifacts/plan.json
 ```
 
@@ -111,4 +113,5 @@ This checks:
 - link extraction
 - sitemap parsing
 - include/optional/exclude heuristics
+- live site orchestration CLI shape
 - final `llms.txt` rendering
