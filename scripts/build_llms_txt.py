@@ -80,11 +80,13 @@ def render_llms_txt(plan: dict) -> str:
 
 def render_llms_full(plan: dict, page_map: dict[str, dict], llms_txt: str) -> str:
     lines = [llms_txt.rstrip(), "", "## Expanded Content", ""]
+    missing_targets: list[str] = []
     for page in plan["pages"]:
         if page["decision"] not in {"include", "optional"}:
             continue
         payload = page_map.get(normalize_url(page["target"]))
         if not payload:
+            missing_targets.append(page["target"])
             continue
         lines.extend(
             [
@@ -96,6 +98,8 @@ def render_llms_full(plan: dict, page_map: dict[str, dict], llms_txt: str) -> st
                 "",
             ]
         )
+    if missing_targets:
+        raise RuntimeError("Missing cleaned page payloads for llms-full.txt: " + ", ".join(missing_targets))
     return "\n".join(lines).rstrip() + "\n"
 
 
