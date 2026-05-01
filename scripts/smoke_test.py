@@ -14,9 +14,16 @@ ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from unittest import mock
+from unittest import mock  # noqa: E402
 
-from llms_site_lib import PageRecord, build_robots_parser, classify_target, normalize_url, resolve_readme_source, unique_records
+from llms_site_lib import (  # noqa: E402
+    PageRecord,
+    build_robots_parser,
+    classify_target,
+    normalize_url,
+    resolve_readme_source,
+    unique_records,
+)
 
 
 def run(*args: str) -> subprocess.CompletedProcess[str]:
