@@ -63,4 +63,5 @@ python3 scripts/smoke_test.py
 
 - `llms.txt` follows the structure described on `llmstxt.org`.
 - `llms-full.txt` here is a practical companion file containing expanded cleaned content for the selected pages; it is not the same name used by every toolchain.
+- The end-to-end generator requires a working `dokobot` CLI plus its browser-side setup for live URL fetching.
 - Detailed heuristics and examples live in [REFERENCE.md](REFERENCE.md).
