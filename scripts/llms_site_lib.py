@@ -251,6 +251,20 @@ def summarize_content(text: str, limit: int = 220) -> str:
     return summary[: limit - 1].rstrip() + "..."
 
 
+def normalized_terms(*values: str) -> set[str]:
+    terms: set[str] = set()
+    for value in values:
+        for part in re.split(r"[^a-z0-9]+", value.lower()):
+            if part:
+                terms.add(part)
+    return terms
+
+
+def keyword_matches_terms(keyword: str, terms: set[str]) -> bool:
+    parts = [part for part in re.split(r"[^a-z0-9]+", keyword.lower()) if part]
+    return bool(parts) and all(part in terms for part in parts)
+
+
 def should_exclude_target(target: str, title: str = "") -> tuple[bool, str]:
     haystack = f"{target} {title}".lower()
     if any(token in haystack for token in EXCLUDE_TOKEN_PATTERNS):
@@ -274,14 +288,15 @@ def classify_target(target: str, title: str = "") -> tuple[str, str, str]:
         return "Excluded", "exclude", reason
 
     haystack = f"{target} {title}".lower()
+    terms = normalized_terms(target, title)
     if any(token in haystack for token in OPTIONAL_TOKEN_PATTERNS):
         return "Optional", "optional", "secondary content"
 
     for section, tokens in INCLUDE_SECTION_MAP:
-        if any(token in haystack for token in tokens):
+        if any(keyword_matches_terms(token, terms) for token in tokens):
             return section, "include", "matched core section token"
 
-    if "readme" in haystack or "docs" in haystack or "documentation" in haystack:
+    if any(keyword_matches_terms(token, terms) for token in {"readme", "docs", "documentation"}):
         return "Docs", "include", "generic docs signal"
 
     return "Docs", "include", "default include"
