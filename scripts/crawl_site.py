@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
+import sys
 from collections import deque
 from pathlib import Path
 from urllib.parse import urlparse
@@ -61,7 +62,11 @@ def parse_args() -> argparse.Namespace:
 
 
 def records_from_sitemap(source: str) -> list[PageRecord]:
-    text = read_text_source(source)
+    try:
+        text = read_text_source(source)
+    except Exception as exc:
+        print(f"Warning: unable to fetch sitemap {source}: {exc}", file=sys.stderr)
+        return []
     urls = parse_sitemap_xml(text)
     records: list[PageRecord] = []
     for url in urls:
@@ -210,7 +215,11 @@ def crawl_live_site(args: argparse.Namespace, allowed_hosts: set[str]) -> tuple[
 
 
 def records_from_readme(source: str, base_url: str | None = None) -> list[PageRecord]:
-    text = read_text_source(resolve_readme_source(source))
+    try:
+        text = read_text_source(resolve_readme_source(source))
+    except Exception as exc:
+        print(f"Warning: unable to fetch README {source}: {exc}", file=sys.stderr)
+        return []
     title, summary = extract_title_and_summary(text)
     records: list[PageRecord] = [
         PageRecord(
