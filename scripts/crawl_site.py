@@ -18,6 +18,7 @@ from llms_site_lib import (
     can_fetch_with_robots,
     classify_target,
     derive_allowed_hosts,
+    description_quality,
     extract_markdown_links,
     extract_title_and_summary,
     filter_records_by_hosts,
@@ -29,9 +30,11 @@ from llms_site_lib import (
     normalize_url,
     parse_sitemap_xml,
     read_text_source,
+    record_priority,
     resolve_readme_source,
     safe_filename,
     summarize_content,
+    title_quality,
     unique_records,
     write_json,
 )
@@ -361,65 +364,32 @@ def enrich_descriptions(records: list[PageRecord], seed_files: list[str]) -> lis
     return enriched
 
 
-PROJECT_SOURCE_PRIORITY = {
-    "site-url": 6,
-    "readme": 5,
-    "docs-dir": 5,
-    "seed-page": 4,
-    "readme-link": 3,
-    "docs-link": 3,
-    "seed-link": 2,
-    "sitemap": 1,
-}
-
-
-def title_quality(title: str) -> int:
-    if not title or title in {"Home", "Untitled"}:
-        return 0
-    score = 1
-    if " " in title:
-        score += 1
-    if len(title) > 8:
-        score += 1
-    return score
-
-
-def summary_quality(summary: str) -> int:
-    if not summary:
-        return 0
-    return min(len(summary.strip()), 240)
-
-
-def source_priority(record: PageRecord) -> int:
-    return max(PROJECT_SOURCE_PRIORITY.get(source, 0) for source in record.source.split(","))
-
-
 def infer_project_metadata(records: list[PageRecord]) -> tuple[str, str]:
     include_records = [record for record in records if record.decision == "include"]
     candidates = include_records or records
 
     title = "Generated llms.txt"
-    title_candidates = [record for record in candidates if title_quality(record.title) > 0]
+    title_candidates = [record for record in candidates if title_quality(record.title, record.target) > 0]
     if title_candidates:
         best_title_record = max(
             title_candidates,
             key=lambda record: (
-                source_priority(record),
-                title_quality(record.title),
-                summary_quality(record.description),
+                record_priority(record)[0],
+                title_quality(record.title, record.target),
+                description_quality(record.description),
             ),
         )
         title = best_title_record.title
 
     summary = "Curated documentation map for LLM consumption."
-    summary_candidates = [record for record in candidates if summary_quality(record.description) > 0]
+    summary_candidates = [record for record in candidates if description_quality(record.description) > 0]
     if summary_candidates:
         best_summary_record = max(
             summary_candidates,
             key=lambda record: (
-                source_priority(record),
-                summary_quality(record.description),
-                title_quality(record.title),
+                record_priority(record)[0],
+                description_quality(record.description),
+                title_quality(record.title, record.target),
             ),
         )
         summary = best_summary_record.description
