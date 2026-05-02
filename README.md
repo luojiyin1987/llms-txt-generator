@@ -16,37 +16,37 @@ Skill scaffold and helper scripts for generating curated `llms.txt` outputs from
 
 ### Install Dokobot
 
-本项目依赖 [Dokobot](https://dokobot.ai) 进行真实浏览器页面读取，支持登录墙、JS 渲染和机器人检测等复杂场景。
+This project uses [Dokobot](https://dokobot.ai) for real-browser page reading, supporting complex scenarios such as login walls, JavaScript rendering, and bot detection.
 
-Dokobot 提供两种安装方式，**至少选择一种**：
+Dokobot offers two installation options; choose at least one:
 
-#### 方式一：Chrome 扩展（推荐，一键安装）
+#### Option 1: Chrome Extension (Recommended)
 
-支持 Chrome、Edge、Brave 和 Arc 浏览器。
+Supports Chrome, Edge, Brave, and Arc.
 
-1. 打开 [Chrome Web Store](https://chromewebstore.google.com/detail/dokobot/dlbiigchkpmpijahmlofleeemiomaneo) 安装 Dokobot 扩展。
-2. 安装完成后，点击扩展图标启动本地服务。
-3. 之后运行本项目的 `--dokobot-local` 模式即可调用。
+1. Install the Dokobot extension from the [Chrome Web Store](https://chromewebstore.google.com/detail/dokobot/dlbiigchkpmpijahmlofleeemiomaneo).
+2. Click the extension icon to start the local service.
+3. Use the `--dokobot-local` flag when running this project.
 
-#### 方式二：Dokobot CLI（命令行 / 脚本化）
+#### Option 2: Dokobot CLI
 
-适合在服务器或 CI 环境中使用。
+Ideal for servers or CI environments.
 
 ```bash
-# 全局安装 CLI
+# Install CLI globally
 npm i -g @dokobot/cli@latest
 
-# 中国大陆网络受限地区可使用镜像
+# For mainland China users with network restrictions
 npm i -g @dokobot/cli@latest --registry=https://registry.npmmirror.com
 ```
 
-安装完成后，确保 `dokobot` 命令在 `PATH` 中可用：
+After installation, make sure the `dokobot` command is available in your `PATH`:
 
 ```bash
 dokobot --version
 ```
 
-更多 Dokobot 使用文档见 [官方指南](https://dokobot.ai/zh-CN/guide)。
+For more Dokobot documentation, see the [official guide](https://dokobot.ai/guide).
 
 ---
 
@@ -56,9 +56,9 @@ dokobot --version
 python3 scripts/smoke_test.py
 ```
 
-### 从实时文档站点生成
+### Generate from a live docs site
 
-使用 Dokobot 读取并生成（需先安装 Chrome 扩展或 CLI）：
+Requires a working Dokobot setup (Chrome extension or CLI):
 
 ```bash
 python3 scripts/generate_llms_txt.py \
@@ -69,9 +69,9 @@ python3 scripts/generate_llms_txt.py \
   --with-ai-suggestions
 ```
 
-### 从本地文档目录生成
+### Generate from a local docs directory
 
-无需 Dokobot，直接读取本地 Markdown：
+No Dokobot required; reads local Markdown directly:
 
 ```bash
 python3 scripts/generate_llms_txt.py \
@@ -80,7 +80,7 @@ python3 scripts/generate_llms_txt.py \
   --with-full
 ```
 
-### 从 GitHub README 生成
+### Generate from a GitHub README
 
 ```bash
 python3 scripts/generate_llms_txt.py \
